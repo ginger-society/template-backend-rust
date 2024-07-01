@@ -9,31 +9,61 @@ use diesel::Identifiable;
 use diesel::{deserialize::Queryable, table, Selectable};
 use schemars::JsonSchema;
 use serde::Serialize;
+mod schema {
+    use diesel::table;
 
-table! {
-    student (id) {
-        #[max_length = 150]
-        name ->Varchar,
-        #[max_length = 40]
-        roll_number ->Varchar,
-        on_scholarship ->Bool,
-        #[max_length = 100]
-        father_name ->Nullable<Varchar>,
-        #[max_length = 500]
-        address ->Varchar,
-        data_of_birth ->Nullable<Date>,
-        created_at ->Timestamptz,
-        updated_at ->Date,
-        has_cab_service ->Nullable<Bool>,
-        id ->BigInt,
+    table! {
+        student (id) {
+            #[max_length = 150]
+            name ->Varchar,
+            #[max_length = 40]
+            roll_number ->Varchar,
+            on_scholarship ->Bool,
+            #[max_length = 100]
+            father_name ->Nullable<Varchar>,
+            #[max_length = 500]
+            address ->Varchar,
+            data_of_birth ->Nullable<Date>,
+            created_at ->Timestamptz,
+            updated_at ->Date,
+            has_cab_service ->Nullable<Bool>,
+            id ->BigInt,
 
+        }
     }
+
+    table! {
+        enrollment (id) {
+            student_id ->BigInt,
+            course_id ->Nullable<BigInt>,
+            id ->BigInt,
+
+        }
+    }
+
+    table! {
+        course (id) {
+            #[max_length = 100]
+            name ->Varchar,
+            course_type ->Varchar,
+            duration ->Nullable<Integer>,
+            id ->BigInt,
+
+        }
+    }
+
+    diesel::joinable!(enrollment -> student (student_id));
+    diesel::joinable!(enrollment -> course (course_id));
+
+    diesel::allow_tables_to_appear_in_same_query!(student, enrollment, course,);
 }
+
+use schema::{course, enrollment, student};
 
 #[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = student)]
-pub struct student {
+pub struct Student {
     pub name: String,
     pub roll_number: String,
     pub on_scholarship: bool,
@@ -46,48 +76,23 @@ pub struct student {
     pub id: i64,
 }
 
-table! {
-    enrollment (id) {
-        student_id ->BigInt,
-        course_id ->Nullable<BigInt>,
-        id ->BigInt,
-
-    }
-}
-
 #[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable, Associations)]
-#[diesel(belongs_to(student, foreign_key = student_id))]
-#[diesel(belongs_to(course, foreign_key = course_id))]
+#[diesel(belongs_to(Student, foreign_key = student_id))]
+#[diesel(belongs_to(Course, foreign_key = course_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = enrollment)]
-pub struct enrollment {
+pub struct Enrollment {
     pub student_id: i64,
     pub course_id: Option<i64>,
     pub id: i64,
 }
 
-table! {
-    course (id) {
-        #[max_length = 100]
-        name ->Varchar,
-        course_type ->Varchar,
-        duration ->Nullable<Integer>,
-        id ->BigInt,
-
-    }
-}
-
 #[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = course)]
-pub struct course {
+pub struct Course {
     pub name: String,
     pub course_type: String,
     pub duration: Option<i32>,
     pub id: i64,
 }
-
-diesel::joinable!(enrollment -> student (student_id));
-diesel::joinable!(enrollment -> course (course_id));
-
-diesel::allow_tables_to_appear_in_same_query!(student, enrollment, course,);
