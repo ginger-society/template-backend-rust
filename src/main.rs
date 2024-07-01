@@ -6,6 +6,7 @@ use dotenv::dotenv;
 use rocket_okapi::openapi_get_routes;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
+use std::process::{exit, Command};
 
 mod db;
 mod errors;
@@ -16,6 +17,20 @@ mod routes;
 
 #[launch]
 fn rocket() -> _ {
+    // Call the `db-compose render --skip` command
+    let output = Command::new("db-compose")
+        .arg("render")
+        .arg("--skip")
+        .output()
+        .expect("Failed to execute `db-compose render --skip`");
+
+    if !output.status.success() {
+        eprintln!("Error: {}", String::from_utf8_lossy(&output.stderr));
+        exit(1);
+    } else {
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+    }
+
     dotenv().ok();
     let prometheus = PrometheusMetrics::new();
 
