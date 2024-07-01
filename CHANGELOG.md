@@ -1,4 +1,18 @@
+## 0.3.0-nightly.0 - 2024-07-01
+chore:
+ - [6858067efe](6858067efe1c618a6c542d9cc1e4fce12cabd714) (Ginger Society Admin) chore: cleanup and testing
+	
+ - [be7ab6ebd3](be7ab6ebd350e242207ce8f7009bb4ebda113c12) (Ginger Society Admin) chore: cleanup and readme update
+	
+feat:
+ - [b8839ded66](b8839ded66ebb42e77476ffca222b534b411fc8f) (Ginger Society Admin) feat: added db-compose render command at the start
+	
+ - [a21c48da9b](a21c48da9b1efd7c06a25aa130b46aaac64d6497) (Ginger Society Admin) feat: cleanup
+	
 ## 0.2.0-nightly.0 - 2024-06-28
+chore:
+ - [af2d385b42](af2d385b422a59a4760023804fd182609eeeeb9d) (Ginger Society Admin) chore: version bump to 0.2.0-nightly.0
+	
 feat:
  - [86d0090970](86d0090970a2ae9cbdc24921af896c317ac347b2) (Ginger Society Admin) feat: commiting changelog to git
 	
