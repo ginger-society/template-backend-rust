@@ -1,4 +1,4 @@
-use crate::models::identity::schema::{administrator, Administrator, Test};
+// use crate::models::identity::schema::{administrator, Administrator, Test};
 use crate::models::response::MessageResponse;
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -11,7 +11,7 @@ use rocket::State;
 use rocket_okapi::openapi;
 
 pub mod customer;
-pub mod tenant;
+// pub mod tenant;
 
 /// This is a description. <br />You can do simple html <br /> like <b>this<b/>
 #[openapi(tag = "Hello World")]
@@ -20,8 +20,8 @@ pub fn index(
     rdb: &State<r2d2::Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
 ) -> Json<MessageResponse> {
-    use crate::models::identity::schema::administrator::dsl::*;
-    use crate::models::identity::schema::test::dsl::*;
+    // use crate::models::identity::schema::administrator::dsl::*;
+    // use crate::models::identity::schema::test::dsl::*;
 
     let mut conn = match rdb.get() {
         Ok(conn) => conn,
@@ -52,22 +52,22 @@ pub fn index(
 
     println!("Value: {:?}", v);
 
-    let results: Vec<Test> = test
-        .filter(field3.eq(true))
-        .load(&mut conn)
-        .expect("Error loading posts");
+    // let results: Vec<Test> = test
+    //     .filter(field3.eq(true))
+    //     .load(&mut conn)
+    //     .expect("Error loading posts");
 
-    let t: Test = test.first(&mut conn).expect("Error loading post");
-    println!("{:?}", t);
-    let t2: Administrator = administrator.first(&mut conn).expect("Error loading post");
-    println!("t2 {:?}", t2);
+    // let t: Test = test.first(&mut conn).expect("Error loading post");
+    // println!("{:?}", t);
+    // let t2: Administrator = administrator.first(&mut conn).expect("Error loading post");
+    // println!("t2 {:?}", t2);
 
-    println!("Displaying {} posts", results.len());
-    for post in results {
-        println!("{}", post.field3);
-        println!("-----------\n");
-        println!("{}", post.id);
-    }
+    // println!("Displaying {} posts", results.len());
+    // for post in results {
+    //     println!("{}", post.field3);
+    //     println!("-----------\n");
+    //     println!("{}", post.id);
+    // }
 
     Json(MessageResponse {
         message: "Hello World!".to_string(),
