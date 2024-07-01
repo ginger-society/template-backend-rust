@@ -1,12 +1,15 @@
+## 
 Fully working CRUD REST API example using 
 - Rust (stable)
 - Rocket.rs
-- mongodb
-- okapi
-
+- MongoDB
+- PostgresSQL
+- Diesel ORM
 
 ## 🚀 Features
 - Establish MongoDB connection using rocket Adhoc fairing.
+- Work with PostgresSQL usinf diesel ORM.
+- Prometheus integration.
 - Custom error handlings with rocket Responder and okapi OpenApiGenerator.
 - CORS fairing and Counter fairing to demonstrate how fairing works.
 - Example model Customer to demonstrate how Rust structs interact with MongoDB.
@@ -28,9 +31,3 @@ Fully working CRUD REST API example using
 ### unit testing
 > cargo test
 
-<br/>
-
-ℹ️ _You should create your own `.env` file including `MONGO_URI`, `MONGO_DB_NAME`, and `API_KEY` to run it._
-
-diesel print-schema > src/schema_generated.rs
-diesel_ext --model > src/models_generated.rs  
