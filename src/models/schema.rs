@@ -9,6 +9,8 @@ use chrono::offset::Utc;
 use chrono::DateTime;
 use diesel::Identifiable;
 use diesel::Associations;
+use rocket::serde::Deserialize;
+
 pub mod schema {
     use diesel::table;
 
@@ -72,7 +74,7 @@ use schema::{ student,enrollment,course, };
 
 
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable)]
 
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = student)]
@@ -91,7 +93,7 @@ pub struct Student {
 }
 
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable,Associations)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
 #[diesel(belongs_to(Student, foreign_key = student_id))]#[diesel(belongs_to(Course, foreign_key = course_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = enrollment)]
@@ -103,7 +105,7 @@ pub struct Enrollment {
 }
 
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable)]
 
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = course)]
@@ -112,5 +114,48 @@ pub struct Course {
     pub course_type:String,
     pub duration:Option<i32>,
     pub id:i64,
+    
+}
+
+
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema)]
+
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = student)]
+pub struct StudentInsertable {
+    pub name:String,
+    pub roll_number:String,
+    pub on_scholarship:bool,
+    pub father_name:Option<String>,
+    pub address:String,
+    pub data_of_birth:Option<NaiveDate>,
+    pub created_at:DateTime<Utc>,
+    pub updated_at:NaiveDate,
+    pub has_cab_service:Option<bool>,
+    
+}
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Associations)]
+#[diesel(belongs_to(Student, foreign_key = student_id))]#[diesel(belongs_to(Course, foreign_key = course_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = enrollment)]
+pub struct EnrollmentInsertable {
+    pub student_id:i64,
+    pub course_id:Option<i64>,
+    
+}
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema)]
+
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = course)]
+pub struct CourseInsertable {
+    pub name:String,
+    pub course_type:String,
+    pub duration:Option<i32>,
     
 }

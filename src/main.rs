@@ -51,7 +51,11 @@ fn rocket() -> Rocket<Build> {
                 routes::customer::post_customer,
                 routes::customer::patch_customer_by_id,
                 routes::customer::delete_customer_by_id,
-                routes::student::get_students
+                routes::student::get_students,
+                routes::student::post_student,
+                routes::student::get_student_by_id,
+                routes::student::delete_student_by_id,
+                routes::student::patch_student_by_id
             ],
         )
         .mount(
