@@ -1,22 +1,31 @@
-## 0.4.0-nightly.0 - 2024-07-02
-chore:
- - [44824d4c62](44824d4c628429655b5a9bbec955dbb027fb1dde) (Ginger Society Admin) chore: cleaned up docker-compose for devcontainer
+## 0.5.0-nightly.0 - 2024-07-02
+feat:
+ - [c5a92f2d53](c5a92f2d53b8ab0932c8674c4320e1cd27044772) (Ginger Society Admin) feat: added crud example for student collection in rdms
 	
+chore:
+ - [cdf00b649c](cdf00b649c63ba7202dcfd3515e932c5c47f1a12) (Ginger Society Admin) chore: added return type to the main function
+	
+## 0.4.0-nightly.0 - 2024-07-02
 feat:
  - [f8e8531e8b](f8e8531e8b19c116dc7f7edaa58170a65629ae32) (Ginger Society Admin) feat: added rdms support example
 	
+chore:
+ - [67bf433d74](67bf433d74b5d45e9b7408d7f82a76d050dc3bb8) (Ginger Society Admin) chore: version bump to 0.4.0-nightly.0
+	
+ - [44824d4c62](44824d4c628429655b5a9bbec955dbb027fb1dde) (Ginger Society Admin) chore: cleaned up docker-compose for devcontainer
+	
 ## 0.3.0-nightly.0 - 2024-07-01
-feat:
- - [b8839ded66](b8839ded66ebb42e77476ffca222b534b411fc8f) (Ginger Society Admin) feat: added db-compose render command at the start
-	
- - [a21c48da9b](a21c48da9b1efd7c06a25aa130b46aaac64d6497) (Ginger Society Admin) feat: cleanup
-	
 chore:
  - [fa070f515f](fa070f515fdc8c7a5933aad93973da52ee16eabe) (Ginger Society Admin) chore: version bump to 0.3.0-nightly.0
 	
  - [6858067efe](6858067efe1c618a6c542d9cc1e4fce12cabd714) (Ginger Society Admin) chore: cleanup and testing
 	
  - [be7ab6ebd3](be7ab6ebd350e242207ce8f7009bb4ebda113c12) (Ginger Society Admin) chore: cleanup and readme update
+	
+feat:
+ - [b8839ded66](b8839ded66ebb42e77476ffca222b534b411fc8f) (Ginger Society Admin) feat: added db-compose render command at the start
+	
+ - [a21c48da9b](a21c48da9b1efd7c06a25aa130b46aaac64d6497) (Ginger Society Admin) feat: cleanup
 	
 ## 0.2.0-nightly.0 - 2024-06-28
 feat:
