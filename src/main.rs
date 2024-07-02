@@ -1,8 +1,10 @@
 #[macro_use]
 extern crate rocket;
+use rocket::Rocket;
 
 use db::redis::create_redis_pool;
 use dotenv::dotenv;
+use rocket::Build;
 use rocket_okapi::openapi_get_routes;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
@@ -16,7 +18,7 @@ mod request_guards;
 mod routes;
 
 #[launch]
-fn rocket() -> _ {
+fn rocket() -> Rocket<Build> {
     // Call the `db-compose render --skip` command
     let output = Command::new("db-compose")
         .arg("render")
