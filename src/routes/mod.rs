@@ -1,5 +1,6 @@
 // use crate::models::identity::schema::{administrator, Administrator, Test};
 use crate::models::response::MessageResponse;
+use crate::models::schema::Student;
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{r2d2, RunQueryDsl};
@@ -11,7 +12,7 @@ use rocket::State;
 use rocket_okapi::openapi;
 
 pub mod customer;
-// pub mod tenant;
+pub mod student;
 
 /// This is a description. <br />You can do simple html <br /> like <b>this<b/>
 #[openapi(tag = "Hello World")]
@@ -20,7 +21,7 @@ pub fn index(
     rdb: &State<r2d2::Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
 ) -> Json<MessageResponse> {
-    // use crate::models::identity::schema::administrator::dsl::*;
+    use crate::models::schema::schema::student::dsl::*;
     // use crate::models::identity::schema::test::dsl::*;
 
     let mut conn = match rdb.get() {
@@ -52,22 +53,22 @@ pub fn index(
 
     println!("Value: {:?}", v);
 
-    // let results: Vec<Test> = test
-    //     .filter(field3.eq(true))
-    //     .load(&mut conn)
-    //     .expect("Error loading posts");
+    let results: Vec<Student> = student
+        .filter(has_cab_service.eq(true))
+        .load(&mut conn)
+        .expect("Error loading posts");
 
     // let t: Test = test.first(&mut conn).expect("Error loading post");
     // println!("{:?}", t);
-    // let t2: Administrator = administrator.first(&mut conn).expect("Error loading post");
-    // println!("t2 {:?}", t2);
+    let t2: Student = student.first(&mut conn).expect("Error loading post");
+    println!("t2 {:?}", t2);
 
-    // println!("Displaying {} posts", results.len());
-    // for post in results {
-    //     println!("{}", post.field3);
-    //     println!("-----------\n");
-    //     println!("{}", post.id);
-    // }
+    println!("Displaying {} posts", results.len());
+    for s in results {
+        println!("{:?}", s.father_name);
+        println!("-----------\n");
+        println!("{}", s.id);
+    }
 
     Json(MessageResponse {
         message: "Hello World!".to_string(),

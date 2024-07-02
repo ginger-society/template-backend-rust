@@ -1,15 +1,15 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use chrono::offset::Utc;
-use chrono::DateTime;
 use chrono::NaiveDate;
-use diesel::Associations;
-use diesel::Identifiable;
 use diesel::{deserialize::Queryable, table, Selectable};
 use schemars::JsonSchema;
 use serde::Serialize;
-mod schema {
+use chrono::offset::Utc;
+use chrono::DateTime;
+use diesel::Identifiable;
+use diesel::Associations;
+pub mod schema {
     use diesel::table;
 
     table! {
@@ -28,19 +28,19 @@ mod schema {
             updated_at ->Date,
             has_cab_service ->Nullable<Bool>,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         enrollment (id) {
             student_id ->BigInt,
             course_id ->Nullable<BigInt>,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         course (id) {
             #[max_length = 100]
@@ -48,51 +48,69 @@ mod schema {
             course_type ->Varchar,
             duration ->Nullable<Integer>,
             id ->BigInt,
-
+            
         }
     }
+    
+    
+        
+    
+        diesel::joinable!(enrollment -> student (student_id));diesel::joinable!(enrollment -> course (course_id));
+    
+        
+    
 
-    diesel::joinable!(enrollment -> student (student_id));
-    diesel::joinable!(enrollment -> course (course_id));
-
-    diesel::allow_tables_to_appear_in_same_query!(student, enrollment, course,);
+    diesel::allow_tables_to_appear_in_same_query!(
+        student,
+        enrollment,
+        course,
+        
+    );
 }
 
-use schema::{course, enrollment, student};
+use schema::{ student,enrollment,course, };
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable)]
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = student)]
 pub struct Student {
-    pub name: String,
-    pub roll_number: String,
-    pub on_scholarship: bool,
-    pub father_name: Option<String>,
-    pub address: String,
-    pub data_of_birth: Option<NaiveDate>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: NaiveDate,
-    pub has_cab_service: Option<bool>,
-    pub id: i64,
+    pub name:String,
+    pub roll_number:String,
+    pub on_scholarship:bool,
+    pub father_name:Option<String>,
+    pub address:String,
+    pub data_of_birth:Option<NaiveDate>,
+    pub created_at:DateTime<Utc>,
+    pub updated_at:NaiveDate,
+    pub has_cab_service:Option<bool>,
+    pub id:i64,
+    
 }
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable, Associations)]
-#[diesel(belongs_to(Student, foreign_key = student_id))]
-#[diesel(belongs_to(Course, foreign_key = course_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable,Associations)]
+#[diesel(belongs_to(Student, foreign_key = student_id))]#[diesel(belongs_to(Course, foreign_key = course_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = enrollment)]
 pub struct Enrollment {
-    pub student_id: i64,
-    pub course_id: Option<i64>,
-    pub id: i64,
+    pub student_id:i64,
+    pub course_id:Option<i64>,
+    pub id:i64,
+    
 }
 
-#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema, Identifiable)]
+
+#[derive(Queryable, Debug, Selectable, Serialize, JsonSchema,Identifiable)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = course)]
 pub struct Course {
-    pub name: String,
-    pub course_type: String,
-    pub duration: Option<i32>,
-    pub id: i64,
+    pub name:String,
+    pub course_type:String,
+    pub duration:Option<i32>,
+    pub id:i64,
+    
 }

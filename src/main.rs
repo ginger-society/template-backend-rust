@@ -49,7 +49,7 @@ fn rocket() -> _ {
                 routes::customer::post_customer,
                 routes::customer::patch_customer_by_id,
                 routes::customer::delete_customer_by_id,
-                // routes::tenant::get_tenants
+                routes::student::get_students
             ],
         )
         .mount(
