@@ -1,4 +1,5 @@
-use okapi::openapi3::{Object, SecurityRequirement, SecurityScheme, SecuritySchemeData};
+
+                        use okapi::openapi3::{Object, SecurityRequirement, SecurityScheme, SecuritySchemeData};
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 use rocket_okapi::gen::OpenApiGenerator;
