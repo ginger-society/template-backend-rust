@@ -19,21 +19,6 @@ pub fn get_students(
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
 
-    // insert_into(student)
-    //     .values((
-    //         name.eq("TName"),
-    //         roll_number.eq("12345"),
-    //         on_scholarship.eq(false),
-    //         father_name.eq(Some("Father Name")),
-    //         address.eq("123 Address St."),
-    //         data_of_birth.eq(Some(NaiveDate::from_ymd_opt(2000, 1, 1).unwrap())),
-    //         created_at.eq(Utc::now().naive_utc()),
-    //         updated_at.eq(NaiveDate::from_ymd_opt(2024, 7, 2).unwrap()),
-    //         has_cab_service.eq(Some(false)),
-    //     ))
-    //     .execute(&mut conn)
-    //     .expect("Error inserting");
-
     let results: Vec<Student> = student.load(&mut conn).expect("Error fetching students");
 
     println!("Displaying {} students", results.len());

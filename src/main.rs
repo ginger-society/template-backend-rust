@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate rocket;
+use fairings::auth::AuthFairing;
 use rocket::Rocket;
+use rocket_okapi::settings::UrlObject;
 
 use db::redis::create_redis_pool;
 use dotenv::dotenv;
@@ -8,55 +10,29 @@ use rocket::Build;
 use rocket_okapi::openapi_get_routes;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
+use std::env;
 use std::process::{exit, Command};
-
+use std::sync::atomic::AtomicUsize;
 mod db;
 mod errors;
 mod fairings;
+mod middlewares;
 mod models;
-mod request_guards;
 mod routes;
 
 #[launch]
 fn rocket() -> Rocket<Build> {
-    // Call the `db-compose render --skip` command
-    let output = Command::new("db-compose")
-        .arg("render")
-        .arg("--skip")
-        .output()
-        .expect("Failed to execute `db-compose render --skip`");
-
-    if !output.status.success() {
-        eprintln!("Error: {}", String::from_utf8_lossy(&output.stderr));
-        exit(1);
-    } else {
-        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
-    }
-
     dotenv().ok();
     let prometheus = PrometheusMetrics::new();
 
-    rocket::build()
-        .attach(db::init())
+    let mut server = rocket::build()
         .manage(db::connect_rdb())
-        .manage(create_redis_pool("redis://127.0.0.1/"))
         .attach(fairings::cors::CORS)
         .attach(prometheus.clone())
+        .attach(AuthFairing)
         .mount(
             "/",
-            openapi_get_routes![
-                routes::index,
-                routes::customer::get_customers,
-                routes::customer::get_customer_by_id,
-                routes::customer::post_customer,
-                routes::customer::patch_customer_by_id,
-                routes::customer::delete_customer_by_id,
-                routes::student::get_students,
-                routes::student::post_student,
-                routes::student::get_student_by_id,
-                routes::student::delete_student_by_id,
-                routes::student::patch_student_by_id
-            ],
+            openapi_get_routes![routes::index, routes::protected_route,],
         )
         .mount(
             "/api-docs",
@@ -65,7 +41,30 @@ fn rocket() -> Rocket<Build> {
                 ..Default::default()
             }),
         )
-        .mount("/metrics", prometheus)
+        .mount("/metrics", prometheus);
+
+    match env::var("MONGO_URI") {
+        Ok(mongo_uri) => match env::var("MONGO_DB_NAME") {
+            Ok(mongo_db_name) => {
+                println!("Attempting to connect to mongo");
+                server = server.manage(db::connect_mongo(mongo_uri, mongo_db_name))
+            }
+            Err(_) => {
+                println!("Not connecting to mongo, missing MONGO_DB_NAME")
+            }
+        },
+        Err(_) => println!("Not connecting to mongo, missing MONGO_URI"),
+    };
+
+    match env::var("REDIS_URI") {
+        Ok(redis_uri) => {
+            println!("Attempting to connect to redis");
+            server = server.manage(create_redis_pool(&redis_uri))
+        }
+        Err(_) => println!("Not connecting to redis"),
+    }
+
+    server
 }
 
 // Unit testings
