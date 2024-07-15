@@ -30,10 +30,7 @@ fn rocket() -> Rocket<Build> {
         .attach(fairings::cors::CORS)
         .attach(prometheus.clone())
         .attach(AuthFairing)
-        .mount(
-            "/",
-            openapi_get_routes![routes::index, routes::protected_route,],
-        )
+        .mount("/", openapi_get_routes![routes::index, routes::route2,])
         .mount(
             "/api-docs",
             make_swagger_ui(&SwaggerUIConfig {
