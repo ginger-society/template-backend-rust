@@ -18,3 +18,4 @@ Cargo.lock
 # env & config
 .env
 config.toml
+IAMService_client
