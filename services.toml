@@ -1,3 +1,16 @@
 dir = "."
 lang = "Rust"
-organization_id = "restaurant-menu"
+organization_id = "org-id"
+
+service_type = "RPCEndpoint"
+spec_url = "/openapi.json"
+
+[services]
+
+[portals_refs]
+[urls]
+dev = "http://localhost:8081/{{name.String}}"
+prod = "http://localhost:8081"
+prod_k8 = "http://localhost:8081"
+stage = "https://example.com/{{name.String}}"
+stage_k8 = "http://examplek8.com/{{name.String}}"
