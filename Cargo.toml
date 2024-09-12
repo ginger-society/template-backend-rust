@@ -10,7 +10,6 @@ version = "0.6.0-nightly.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-IAMService = {path = "IAMService_client"}
 chrono = {version = "0.4", features = ["serde"]}
 diesel = {version = "2.1.5", features = ["postgres", "r2d2", "chrono", "serde_json"]}
 dotenv = "0.15.0"
