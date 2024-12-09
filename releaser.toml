@@ -1,7 +1,7 @@
 [version]
 channel = "Nightly"
 major = 0
-minor = 6
+minor = 0
 patch = 0
 revision = 0
 
@@ -11,4 +11,4 @@ output_type = "String"
 variable = "version"
 
 [settings]
-git_url_prefix = ""
+git_url_prefix = "https://github.com/ginger-society/template-backend-rust"

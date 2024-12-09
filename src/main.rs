@@ -15,6 +15,8 @@ mod middlewares;
 mod models;
 mod routes;
 
+const SERVICE_PREFIX: &str = "service-name-here";
+
 #[launch]
 fn rocket() -> Rocket<Build> {
     dotenv().ok();
@@ -24,15 +26,18 @@ fn rocket() -> Rocket<Build> {
         .manage(db::connect_rdb())
         .attach(fairings::cors::CORS)
         .attach(prometheus.clone())
-        .mount("/", openapi_get_routes![routes::index])
         .mount(
-            "/api-docs",
+            format!("/{}/", SERVICE_PREFIX),
+            openapi_get_routes![routes::index,],
+        )
+        .mount(
+            format!("/{}/api-docs", SERVICE_PREFIX),
             make_swagger_ui(&SwaggerUIConfig {
                 url: "../openapi.json".to_owned(),
                 ..Default::default()
             }),
         )
-        .mount("/metrics", prometheus);
+        .mount(format!("/{}/metrics", SERVICE_PREFIX), prometheus);
 
     match env::var("MONGO_URI") {
         Ok(mongo_uri) => match env::var("MONGO_DB_NAME") {
@@ -50,7 +55,7 @@ fn rocket() -> Rocket<Build> {
     match env::var("REDIS_URI") {
         Ok(redis_uri) => {
             println!("Attempting to connect to redis");
-            server = server.manage(create_redis_pool(&redis_uri))
+            server = server.manage(create_redis_pool(redis_uri))
         }
         Err(_) => println!("Not connecting to redis"),
     }

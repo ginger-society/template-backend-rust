@@ -1,9 +1,24 @@
-FROM rust:1-slim-bullseye
+FROM gingersociety/rust-rocket-api-builder:latest as builder
 
-RUN apt update
-RUN apt install curl zsh nano docker.io pkg-config libssl-dev gcc-mingw-w64-x86-64 libpq-dev -y
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" -y
+ARG GINGER_TOKEN
 
-RUN rustup target add x86_64-pc-windows-gnu
-RUN rustup component add rustfmt
-RUN echo "zsh" >> ~/.bashrc
+# Create a new directory for the app
+WORKDIR /app
+COPY . .
+# Run the ginger-auth command and capture the output
+RUN ginger-auth token-login $GINGER_TOKEN
+RUN ginger-connector connect stage-k8
+# Build the application in release mode
+RUN cargo build --release
+
+# Second stage: Create the minimal runtime image
+FROM gingersociety/rust-rocket-api-runner:latest
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/target/release/SampleService /app/
+
+# Set the working directory
+WORKDIR /app
+
+# Run the executable when the container starts
+ENTRYPOINT ["./SampleService"]
