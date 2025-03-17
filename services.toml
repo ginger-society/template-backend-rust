@@ -1,5 +1,5 @@
 lang = "Rust"
-organization_id = "ginger-society"
+organization_id = "rackmint"
 dir = "."
 spec_url = "/openapi.json"
 service_type = "RPCEndpoint"
@@ -13,9 +13,12 @@ stage_k8 = "http://iam-service-api-service/iam"
 
 [ws_refs]
 
+
 [urls]
-stage_k8 = "http://iam-service-api-service/iam"
-stage = "https://api-staging.gingersociety.org/iam"
+stage_k8 = "http://provisioner-api-service/provisioner"
+stage = "http://localhost:8080/provisioner"
 prod = "https://exampleapi.com"
 prod_k8 = "https://exampleapi.com"
-dev = "http://localhost:8080/iam"
+dev = "http://localhost:8080/provisioner"
+
+[urls_ws]

@@ -1,0 +1,60 @@
+use crate::models::schema::{Cluster, ClusterInsertable};
+use crate::models::request::CreateClusterRequest;
+use crate::models::response::CreateClusterResponse;
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use rocket::http::Status;
+use rocket::response::status;
+use rocket::serde::json::Json;
+use rocket::State;
+use rocket_okapi::openapi;
+use uuid::Uuid;
+use chrono::Utc;
+
+#[openapi()]
+#[post("/cluster", data = "<create_request>")]
+pub async fn create_cluster(
+    db_pool: &State<Pool<ConnectionManager<PgConnection>>>,
+    create_request: Json<CreateClusterRequest>,
+) -> Result<status::Created<Json<CreateClusterResponse>>, status::Custom<String>> {
+    use crate::models::schema::schema::cluster::dsl::*;
+    let mut conn = db_pool.get().map_err(|_| {
+        status::Custom(
+            Status::ServiceUnavailable,
+            "Failed to get DB connection".to_string(),
+        )
+    })?;
+
+    let cluster_uuid = Uuid::new_v4().to_string();
+
+    let new_cluster = ClusterInsertable {
+        identifier: cluster_uuid.clone(),
+        name: create_request.name.clone(),
+        parent_server_fqdn: create_request.parent_server_fqdn.clone(),
+        identify_file_name: create_request.identify_file_name.clone(),
+        group_id: create_request.group_id.clone(),
+        description: create_request.description.clone(),
+        cluster_ip: create_request.cluster_ip.clone(),
+        cpu_limit: create_request.cpu_limit,
+        ram_limit: create_request.ram_limit,
+        state: create_request.state.clone(),
+        woskspace_id: create_request.workspace_id.clone(),
+        ipv4: Some(create_request.ipv4.clone())
+    };
+
+    let created_cluster: Cluster = diesel::insert_into(cluster)
+        .values(&new_cluster)
+        .get_result::<Cluster>(&mut conn)
+        .map_err(|_| {
+            status::Custom(
+                Status::InternalServerError,
+                "Error inserting new cluster".to_string(),
+            )
+        })?;
+
+    Ok(status::Created::new("/cluster").body(Json(CreateClusterResponse {
+        message: "Cluster created successfully".to_string(),
+        id: created_cluster.id,
+        identifier: created_cluster.identifier.clone(),
+    })))
+}

@@ -7,6 +7,7 @@ use rocket::fairing::AdHoc;
 use std::env;
 
 pub mod redis;
+pub mod rabbitmq;
 
 pub fn connect_mongo(mongo_uri: String, mongo_db_name: String) -> AdHoc {
     AdHoc::on_ignite("Connecting to MongoDB", |rocket| async {

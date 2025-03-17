@@ -2,6 +2,8 @@ use ginger_shared_rs::rocket_models::MessageResponse;
 use rocket::serde::json::Json;
 use rocket_okapi::openapi;
 
+pub mod provisioner;
+
 /// This is a description. <br />You can do simple html <br /> like <b>this<b/>
 #[openapi()]
 #[get("/")]

@@ -2,9 +2,9 @@
 description = "Description of the service goes here"
 edition = "2021"
 license = "MIT"
-name = "SampleService"
+name = "ProvisionerService"
 readme = "README.md"
-repository = "https://github.com/ginger-society/template-backend-rust"
+repository = ""
 version = "0.5.0-nightly.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,6 +18,7 @@ dotenv = "0.15.0"
 futures = "0.3"
 ginger-shared-rs = "0.34.0-nightly.0"
 jsonwebtoken = "9.3.0"
+lapin = "2.5.1"
 mongodb = "2.1.0"
 okapi = {version = "0.7.0"}
 r2d2_redis = "0.14.0"
@@ -32,6 +33,11 @@ schemars = {version = "0.8", features = ["chrono"]}
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 serde_with = "3.7.0"
+tokio = "1.44.1"
+tokio-amqp = "2.0.0"
+tokio-stream = "0.1.17"
+uuid = "1.10.0"
+
 
 [package.metadata]
-organization = "ginger-society"
+organization = "rackmint"
