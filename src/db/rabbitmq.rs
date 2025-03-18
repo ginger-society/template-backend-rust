@@ -8,11 +8,14 @@ use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 use tokio_stream::StreamExt;
 use tokio::time::{sleep, Duration};
-
+use rocket::State;
+use diesel::{r2d2::ConnectionManager, ExpressionMethods, RunQueryDsl};
 use crate::db::cluster_helper::create_execute_ssh_script; // ✅ Required for `.next()`
-
+use diesel::PgConnection;
+use diesel::r2d2::Pool;
 pub type RabbitMQPool = Arc<Mutex<Connection>>;
-
+pub type DbPool = Pool<ConnectionManager<PgConnection>>;
+use diesel::query_dsl::methods::FilterDsl;
 #[derive(Debug, Deserialize, Serialize)]
 struct ClusterConfig {
     name: String,
@@ -28,8 +31,24 @@ pub async fn create_rabbitmq_pool(rabbitmq_uri: String) -> RabbitMQPool {
     Arc::new(Mutex::new(connection))
 }
 
+// ✅ Update cluster state in the database
+pub async fn update_cluster_state(db_pool: &DbPool, cluster_name: &str, new_state: &str) -> Result<(), diesel::result::Error> {
+    let mut conn = db_pool.get().expect("Failed to get DB connection");
+    use crate::models::schema::schema::cluster::dsl::*;
+
+
+    diesel::update(cluster.filter(name.eq(cluster_name)))
+        .set(state.eq(new_state))
+        .execute(&mut conn)?;
+
+    println!("✅ Cluster '{}' state updated to '{}'", cluster_name, new_state);
+    Ok(())
+}
+
+
 pub async fn start_rabbitmq_consumer(
     rabbitmq_pool: Arc<Mutex<lapin::Connection>>,
+    db_pool: DbPool,
     queue_name: String,
 ) {
     let connection = rabbitmq_pool.lock().await;
@@ -80,7 +99,9 @@ pub async fn start_rabbitmq_consumer(
     };
 
     println!("✅ Consumer started on queue '{}'", queue_name);
-
+// ✅ Clone db_pool so it can be moved into the async task
+    let db_pool = db_pool.clone(); 
+    
     task::spawn(async move {
         let mut consumer_stream = consumer.into_stream();
 
@@ -105,8 +126,20 @@ pub async fn start_rabbitmq_consumer(
                         let ssh_user = "dc0102"; // ✅ SSH username
                         let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
 
+
+                        // ✅ Update cluster state to "init"
+                        if let Err(err) = update_cluster_state(&db_pool, cluster_name, "init").await {
+                            eprintln!("❌ Failed to update cluster '{}' state: {:?}", cluster_name, err);
+                            continue;
+                        }
+
                         match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
-                            Ok(_) => println!("🎉 Cluster creation completed successfully!"),
+                            Ok(_) => {
+                                println!("🎉 Cluster creation completed successfully!");
+                                if let Err(err) = update_cluster_state(&db_pool, cluster_name, "running").await {
+                                    eprintln!("❌ Failed to update cluster '{}' state to 'running': {:?}", cluster_name, err);
+                                }
+                            },
                             Err(error) => eprintln!("❌ Cluster creation failed: {}", error),
                         }
                     } else {

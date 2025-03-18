@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
+use db::rabbitmq::DbPool;
 use dotenv::dotenv;
 use rocket::{Rocket, Build};
 use rocket_okapi::openapi_get_routes;
@@ -22,6 +23,8 @@ async fn main() {
     dotenv().ok();
     
     println!("Starting server...");
+
+    let pg_pool = db::connect_rdb();
     
     // ✅ Move async DB connections inside a `tokio::spawn`
     let mongo_handle = task::spawn(async {
@@ -44,19 +47,23 @@ async fn main() {
         }
     });
 
-    let rabbitmq_handle = task::spawn(async {
-        if let Ok(rabbitmq_uri) = env::var("RABBITMQ_URI") {
-            println!("Connecting to RabbitMQ...");
-            let pool = db::rabbitmq::create_rabbitmq_pool(rabbitmq_uri.clone()).await;
-    
-            let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
+    let rabbitmq_handle = task::spawn({
+        let db_pool = pg_pool.clone(); // ✅ Clone `pg_pool` for RabbitMQ consumer
 
-            db::rabbitmq::start_rabbitmq_consumer(pool.clone(), queue_name).await;  // ✅ Start consumer
-    
-            Some(pool)
-        } else {
-            println!("Skipping RabbitMQ connection (missing env variable)");
-            None
+        async move {
+            if let Ok(rabbitmq_uri) = env::var("RABBITMQ_URI") {
+                println!("Connecting to RabbitMQ...");
+                let rabbitmq_pool = db::rabbitmq::create_rabbitmq_pool(rabbitmq_uri.clone()).await;
+
+                let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
+
+                db::rabbitmq::start_rabbitmq_consumer(rabbitmq_pool.clone(), db_pool, queue_name).await;  // ✅ Pass `db_pool`
+
+                Some(rabbitmq_pool)
+            } else {
+                println!("Skipping RabbitMQ connection (missing env variable)");
+                None
+            }
         }
     });
 
