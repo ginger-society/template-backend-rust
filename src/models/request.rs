@@ -11,6 +11,7 @@ pub struct CreateClusterRequest {
     pub cluster_ip: String,
     pub cpu_limit: f64,
     pub ram_limit: f64,
+    pub disk_size: i32,
     pub state: Option<String>,
     pub workspace_id: String,
     pub ipv4:String

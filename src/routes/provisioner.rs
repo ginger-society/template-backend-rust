@@ -43,7 +43,8 @@ pub async fn create_cluster(
         ram_limit: create_request.ram_limit,
         state: create_request.state.clone(),
         woskspace_id: create_request.workspace_id.clone(),
-        ipv4: Some(create_request.ipv4.clone())
+        ipv4: Some(create_request.ipv4.clone()),
+        disk_space: create_request.disk_size.clone()
     };
 
     let created_cluster: Cluster = diesel::insert_into(cluster)
@@ -57,11 +58,14 @@ pub async fn create_cluster(
         })?;
 
 
-        // ✅ Publish to RabbitMQ
+    // ✅ RabbitMQ Message
     let message = serde_json::json!({
         "event": "ClusterCreated",
         "identifier": created_cluster.identifier,
         "name": created_cluster.name,
+        "cpu_limit": created_cluster.cpu_limit,
+        "ram_limit": created_cluster.ram_limit,
+        "disk_size":created_cluster.disk_space,  // Assuming a default or configurable disk size
         "timestamp": Utc::now().to_rfc3339(),
     })
     .to_string();
