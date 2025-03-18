@@ -47,7 +47,13 @@ async fn main() {
     let rabbitmq_handle = task::spawn(async {
         if let Ok(rabbitmq_uri) = env::var("RABBITMQ_URI") {
             println!("Connecting to RabbitMQ...");
-            Some(db::rabbitmq::create_rabbitmq_pool(rabbitmq_uri).await)
+            let pool = db::rabbitmq::create_rabbitmq_pool(rabbitmq_uri.clone()).await;
+    
+            let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
+
+            db::rabbitmq::start_rabbitmq_consumer(pool.clone(), queue_name).await;  // ✅ Start consumer
+    
+            Some(pool)
         } else {
             println!("Skipping RabbitMQ connection (missing env variable)");
             None

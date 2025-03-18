@@ -1,10 +1,12 @@
 use futures::TryStreamExt;
 use lapin::{
-    options::BasicConsumeOptions, types::FieldTable, Connection, ConnectionProperties, Consumer,
+    options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions}, types::FieldTable, Connection, ConnectionProperties, Consumer,
 };
 use std::sync::Arc;
 use tokio::{sync::Mutex, task};
-use tokio_stream::StreamExt; // ✅ Required for `.next()`
+use tokio_stream::StreamExt;
+
+use crate::db::cluster_helper::create_execute_ssh_script; // ✅ Required for `.next()`
 
 pub type RabbitMQPool = Arc<Mutex<Connection>>;
 
@@ -15,41 +17,88 @@ pub async fn create_rabbitmq_pool(rabbitmq_uri: String) -> RabbitMQPool {
     Arc::new(Mutex::new(connection))
 }
 
-// Function to start consuming messages
-pub async fn start_rabbitmq_consumer(rabbitmq_pool: RabbitMQPool, queue_name: String) {
+pub async fn start_rabbitmq_consumer(
+    rabbitmq_pool: Arc<Mutex<lapin::Connection>>,
+    queue_name: String,
+) {
     let connection = rabbitmq_pool.lock().await;
-    let channel = connection.create_channel().await.expect("Failed to create channel");
+    let channel = match connection.create_channel().await {
+        Ok(channel) => channel,
+        Err(err) => {
+            eprintln!("❌ Failed to create RabbitMQ channel: {:?}", err);
+            return;
+        }
+    };
 
-    let consumer: Consumer = channel
+    // ✅ Ensure queue exists before consuming
+    match channel
+        .queue_declare(
+            &queue_name,
+            QueueDeclareOptions {
+                durable: true, // Queue persists even after RabbitMQ restarts
+                exclusive: false,
+                auto_delete: false,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await
+    {
+        Ok(_) => println!("✅ Queue '{}' is ready", queue_name),
+        Err(err) => {
+            eprintln!("❌ Failed to declare queue '{}': {:?}", queue_name, err);
+            return;
+        }
+    };
+
+    // ✅ Now start the consumer
+    let consumer: Consumer = match channel
         .basic_consume(
-            &queue_name, // ✅ Use a reference here
+            &queue_name,
             "consumer_tag",
             BasicConsumeOptions::default(),
             FieldTable::default(),
         )
         .await
-        .expect("Failed to start consumer");
+    {
+        Ok(consumer) => consumer,
+        Err(err) => {
+            eprintln!("❌ Failed to start consumer: {:?}", err);
+            return;
+        }
+    };
+
+    println!("✅ Consumer started on queue '{}'", queue_name);
 
     task::spawn(async move {
-        println!("Waiting for messages on queue: {}", queue_name); // ✅ queue_name now owned
-        let mut consumer_stream = consumer.into_stream(); // Convert Consumer to Stream
+        let mut consumer_stream = consumer.into_stream();
 
         while let Some(delivery_result) = consumer_stream.next().await {
             match delivery_result {
                 Ok(delivery) => {
                     let message = String::from_utf8_lossy(&delivery.data);
-                    println!("Received message: {}", message);
+                    println!("📩 Received message: {}", message);
 
-                    // Acknowledge the message
+                    let ssh_host = "dc0102.rackmint.com"; // ✅ Change this to your target machine
+                    let ssh_user = "dc0102"; // ✅ SSH username
+                    let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
+
+                    match create_execute_ssh_script(ssh_host, ssh_user, script_path).await {
+                        Ok(_) => println!("🎉 Cluster creation completed successfully!"),
+                        Err(error) => eprintln!("❌ Cluster creation failed: {}", error),
+                    }
+                    
+
+                    // ✅ Acknowledge the message
                     if let Err(err) = delivery
-                        .ack(lapin::options::BasicAckOptions::default())
+                        .ack(BasicAckOptions::default())
                         .await
                     {
-                        println!("Failed to acknowledge message: {:?}", err);
+                        println!("❌ Failed to acknowledge message: {:?}", err);
                     }
                 }
                 Err(err) => {
-                    println!("Error receiving message: {:?}", err);
+                    println!("❌ Error receiving message: {:?}", err);
                 }
             }
         }

@@ -3,6 +3,8 @@ use crate::models::request::CreateClusterRequest;
 use crate::models::response::CreateClusterResponse;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use lapin::options::BasicPublishOptions;
+use lapin::BasicProperties;
 use rocket::http::Status;
 use rocket::response::status;
 use rocket::serde::json::Json;
@@ -10,11 +12,13 @@ use rocket::State;
 use rocket_okapi::openapi;
 use uuid::Uuid;
 use chrono::Utc;
+use crate::db::rabbitmq;
 
 #[openapi()]
 #[post("/cluster", data = "<create_request>")]
 pub async fn create_cluster(
     db_pool: &State<Pool<ConnectionManager<PgConnection>>>,
+    rabbitmq_pool: &State<rabbitmq::RabbitMQPool>,
     create_request: Json<CreateClusterRequest>,
 ) -> Result<status::Created<Json<CreateClusterResponse>>, status::Custom<String>> {
     use crate::models::schema::schema::cluster::dsl::*;
@@ -50,6 +54,36 @@ pub async fn create_cluster(
                 Status::InternalServerError,
                 "Error inserting new cluster".to_string(),
             )
+        })?;
+
+
+        // ✅ Publish to RabbitMQ
+    let message = serde_json::json!({
+        "event": "ClusterCreated",
+        "identifier": created_cluster.identifier,
+        "name": created_cluster.name,
+        "timestamp": Utc::now().to_rfc3339(),
+    })
+    .to_string();
+
+    let queue_name = std::env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
+
+    let rabbitmq_conn = rabbitmq_pool.lock().await;
+    let channel = rabbitmq_conn.create_channel().await.map_err(|_| {
+        status::Custom(Status::InternalServerError, "Failed to create RabbitMQ channel".to_string())
+    })?;
+
+    channel
+        .basic_publish(
+            "",
+            &queue_name,
+            BasicPublishOptions::default(),
+            message.as_bytes(),
+            BasicProperties::default(),
+        )
+        .await
+        .map_err(|_| {
+            status::Custom(Status::InternalServerError, "Failed to publish message".to_string())
         })?;
 
     Ok(status::Created::new("/cluster").body(Json(CreateClusterResponse {
