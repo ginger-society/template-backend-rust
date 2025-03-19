@@ -1,12 +1,15 @@
 use r2d2_redis::{r2d2::Pool, RedisConnectionManager};
-use std::{ops::Deref, process::exit};
+use std::{env, ops::Deref, process::exit};
 
 // Define a type alias for your Redis connection pool
 type RedisPool = Pool<RedisConnectionManager>;
 
 // Function to create and return a Redis connection pool
-pub fn create_redis_pool(redis_url: String) -> RedisPool {
+pub fn create_redis_pool() -> RedisPool {
     // Create a Redis connection manager
+
+    let redis_url = env::var("REDIS_URI").expect("REDIS_URI must be set");
+
     let manager = RedisConnectionManager::new(redis_url).unwrap();
 
     // Create a pool with the manager

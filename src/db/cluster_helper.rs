@@ -1,8 +1,14 @@
+use diesel::{r2d2::PooledConnection, PgConnection};
+use diesel::prelude::*;
 use openssh::{KnownHosts, Session, Stdio};
+use r2d2_redis::redis::Commands;
+use r2d2_redis::RedisConnectionManager;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     time::{timeout, Duration},
 };
+
+use crate::models::schema::Compute_Unit;
 
 pub async fn create_execute_ssh_script(
     ssh_host: &str,
@@ -81,4 +87,60 @@ pub async fn create_execute_ssh_script(
         Ok(result) => result,
         Err(_) => Err("⏳ SSH command timed out after 5 minutes".to_string()),
     }
+}
+
+
+/// **Fetch the first available compute unit that is not locked in Redis**
+pub fn get_available_compute_unit(
+    conn: &mut PgConnection,
+    cache_conn: &mut PooledConnection<RedisConnectionManager>,
+    region: &str,
+) -> Result<Option<Compute_Unit>, diesel::result::Error> {
+    use crate::models::schema::schema::compute_unit::dsl::*;
+
+    let mut excluded_ids = vec![];
+
+    loop {
+        // Query the first available compute unit in the region
+        let compute_unit_result = compute_unit
+            .filter(available.eq(true))
+            .filter(region_code.eq(region))
+            .filter(id.ne_all(&excluded_ids)) // Exclude locked units
+            .first::<Compute_Unit>(conn)
+            .optional()?;
+
+        if let Some(unit) = compute_unit_result {
+            let lock_key = format!("LOCK_{}", unit.id);
+
+            // Check if it's locked in Redis
+            let is_locked: bool = cache_conn.get(&lock_key).unwrap_or(false);
+
+            if !is_locked {
+                // Lock the compute unit in Redis for 1 hour
+                let set_result: Result<(), _> = cache_conn.set_ex(&lock_key, true, 3600);
+            
+                match set_result {
+                    Ok(_) => {
+                        println!("✅ Successfully added lock in the cache: {:?} , {:?}", lock_key, unit);
+                        return Ok(Some(unit));
+                    }
+                    Err(err) => {
+                        println!("❌ Failed to add lock in the cache: {:?}, Error: {:?}", lock_key, err);
+                        return Err(diesel::result::Error::RollbackTransaction); // Or handle error appropriately
+                    }
+                }
+            }
+
+            // If locked, add to exclusion list and retry
+            excluded_ids.push(unit.id);
+        } else {
+            return Ok(None); // No available compute units found
+        }
+    }
+}
+
+/// **Release the lock on a compute unit after use**
+pub fn release_compute_unit_lock(cache_conn: &mut PooledConnection<RedisConnectionManager> , compute_unit_id: i64) {
+    let lock_key = format!("LOCK_{}", compute_unit_id);
+    let _: () = cache_conn.del(&lock_key).unwrap_or(());
 }

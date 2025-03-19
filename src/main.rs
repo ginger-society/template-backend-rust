@@ -9,6 +9,7 @@ use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
 use std::env;
 use tokio::task;
+use crate::db::redis::create_redis_pool;
 
 mod db;
 mod fairings;
@@ -25,6 +26,8 @@ async fn main() {
     println!("Starting server...");
 
     let pg_pool = db::connect_rdb();
+    let cache_pool = db::redis::create_redis_pool();
+    
     
     // ✅ Move async DB connections inside a `tokio::spawn`
     let mongo_handle = task::spawn(async {
@@ -37,19 +40,10 @@ async fn main() {
         }
     });
 
-    let redis_handle = task::spawn(async {
-        if let Ok(redis_uri) = env::var("REDIS_URI") {
-            println!("Connecting to Redis...");
-            Some(db::redis::create_redis_pool(redis_uri))
-        } else {
-            println!("Skipping Redis connection (missing env variable)");
-            None
-        }
-    });
 
     let rabbitmq_handle = task::spawn({
         let db_pool = pg_pool.clone(); // ✅ Clone `pg_pool` for RabbitMQ consumer
-
+        let cache_pool = cache_pool.clone();
         async move {
             if let Ok(rabbitmq_uri) = env::var("RABBITMQ_URI") {
                 println!("Connecting to RabbitMQ...");
@@ -57,7 +51,7 @@ async fn main() {
 
                 let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
 
-                db::rabbitmq::start_rabbitmq_consumer(rabbitmq_pool.clone(), db_pool, queue_name).await;  // ✅ Pass `db_pool`
+                db::rabbitmq::start_rabbitmq_consumer(rabbitmq_pool.clone(), db_pool, cache_pool, queue_name).await;  // ✅ Pass `db_pool`
 
                 Some(rabbitmq_pool)
             } else {
@@ -85,19 +79,15 @@ async fn main() {
         )
         .mount(format!("/{}/metrics", SERVICE_PREFIX), prometheus);
 
-        // ✅ Create a PostgreSQL connection pool
-    let pg_pool = db::connect_rdb();
 
         // ✅ Add PostgreSQL pool to Rocket
     server = server.manage(pg_pool);
-
+    server = server.manage(cache_pool);
     // ✅ Wait for DB connections before attaching them
     if let Ok(Some(mongo_conn)) = mongo_handle.await {
         server = server.manage(mongo_conn);
     }
-    if let Ok(Some(redis_conn)) = redis_handle.await {
-        server = server.manage(redis_conn);
-    }
+
     if let Ok(Some(rabbit_conn)) = rabbitmq_handle.await {
         server = server.manage(rabbit_conn);
     }

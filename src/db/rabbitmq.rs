@@ -2,6 +2,7 @@ use futures::TryStreamExt;
 use lapin::{
     options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions}, types::FieldTable, Connection, ConnectionProperties, Consumer,
 };
+use r2d2_redis::RedisConnectionManager;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use tokio_stream::StreamExt;
 use tokio::time::{sleep, Duration};
 use rocket::State;
 use diesel::{r2d2::ConnectionManager, ExpressionMethods, RunQueryDsl};
-use crate::db::cluster_helper::create_execute_ssh_script; // ✅ Required for `.next()`
+use crate::{db::cluster_helper::{create_execute_ssh_script, get_available_compute_unit, release_compute_unit_lock}, models::schema::Compute_Unit}; // ✅ Required for `.next()`
 use diesel::PgConnection;
 use diesel::r2d2::Pool;
 pub type RabbitMQPool = Arc<Mutex<Connection>>;
@@ -49,6 +50,7 @@ pub async fn update_cluster_state(db_pool: &DbPool, cluster_name: &str, new_stat
 pub async fn start_rabbitmq_consumer(
     rabbitmq_pool: Arc<Mutex<lapin::Connection>>,
     db_pool: DbPool,
+    cache_pool: Pool<RedisConnectionManager>,
     queue_name: String,
 ) {
     let connection = rabbitmq_pool.lock().await;
@@ -122,7 +124,27 @@ pub async fn start_rabbitmq_consumer(
                         let memory = format!("{}g", json_data["ram_limit"].as_f64().unwrap_or(2.0));  // Defaults to 2.0
                         let disk_size = format!("{}g", json_data["disk_size"].as_i64().unwrap_or(10)); // Defaults to 10
 
-                        let ssh_host = "dc0102.rackmint.com"; // ✅ Change this to your target machine
+                        let mut conn = db_pool.get().expect("Failed to get DB connection");
+                        let mut cache_conn = cache_pool.get().expect("Failed to get cache connection");
+
+                                                // Get an available compute unit that is not locked
+                        let cu: Option<Compute_Unit> = match get_available_compute_unit(&mut conn, &mut cache_conn, "ap_south_1") {
+                            Ok(Some(unit)) => Some(unit),
+                            Ok(None) => {
+                                println!("No available compute unit found in the requested region");
+                                None
+                            }
+                            Err(_) => {
+                                println!("Error querying compute units");
+                                None
+                            }
+                        };
+
+                        // proceed only if there is a CU available
+
+
+
+                        let ssh_host = &cu.unwrap().fqdn; // ✅ Change this to your target machine
                         let ssh_user = "dc0102"; // ✅ SSH username
                         let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
 
@@ -136,6 +158,8 @@ pub async fn start_rabbitmq_consumer(
                         match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
                             Ok(_) => {
                                 println!("🎉 Cluster creation completed successfully!");
+                                // ✅ Release lock after cluster creation
+                                release_compute_unit_lock(&mut cache_conn, cu.unwrap().id);
                                 if let Err(err) = update_cluster_state(&db_pool, cluster_name, "running").await {
                                     eprintln!("❌ Failed to update cluster '{}' state to 'running': {:?}", cluster_name, err);
                                 }
