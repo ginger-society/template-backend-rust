@@ -144,7 +144,7 @@ pub async fn start_rabbitmq_consumer(
 
 
 
-                        let ssh_host = &cu.unwrap().fqdn; // ✅ Change this to your target machine
+                        let ssh_host = &cu.clone().unwrap().fqdn; // ✅ Change this to your target machine
                         let ssh_user = "dc0102"; // ✅ SSH username
                         let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
 
