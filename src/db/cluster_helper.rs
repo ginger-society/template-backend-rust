@@ -121,7 +121,7 @@ pub fn get_available_compute_unit(
             
                 match set_result {
                     Ok(_) => {
-                        println!("✅ Successfully added lock in the cache: {:?} , {:?}", lock_key, unit);
+                        println!("✅ Successfully added lock in the cache: {:?} ", lock_key);
                         return Ok(Some(unit));
                     }
                     Err(err) => {
