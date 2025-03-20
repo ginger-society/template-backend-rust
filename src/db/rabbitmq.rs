@@ -128,44 +128,43 @@ pub async fn start_rabbitmq_consumer(
                         let mut cache_conn = cache_pool.get().expect("Failed to get cache connection");
 
                                                 // Get an available compute unit that is not locked
-                        let cu: Option<Compute_Unit> = match get_available_compute_unit(&mut conn, &mut cache_conn, "ap_south_1") {
-                            Ok(Some(unit)) => Some(unit),
+                        match get_available_compute_unit(&mut conn, &mut cache_conn, "ap_south_1") {
+                            Ok(Some(unit)) =>{
+
+                                // proceed only if there is a CU available
+
+                                let ssh_host = &unit.clone().fqdn; // ✅ Change this to your target machine
+                                let ssh_user = "dc0102"; // ✅ SSH username
+                                let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
+
+
+                                // ✅ Update cluster state to "init"
+                                if let Err(err) = update_cluster_state(&db_pool, cluster_name, "init").await {
+                                    eprintln!("❌ Failed to update cluster '{}' state: {:?}", cluster_name, err);
+                                    continue;
+                                }
+
+                                match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
+                                    Ok(_) => {
+                                        println!("🎉 Cluster creation completed successfully!");
+                                        // ✅ Release lock after cluster creation
+                                        release_compute_unit_lock(&mut cache_conn, unit.id);
+                                        if let Err(err) = update_cluster_state(&db_pool, cluster_name, "running").await {
+                                            eprintln!("❌ Failed to update cluster '{}' state to 'running': {:?}", cluster_name, err);
+                                        }
+                                    },
+                                    Err(error) => eprintln!("❌ Cluster creation failed: {}", error),
+                                }
+                            },
                             Ok(None) => {
                                 println!("No available compute unit found in the requested region");
-                                None
                             }
                             Err(_) => {
                                 println!("Error querying compute units");
-                                None
                             }
                         };
 
-                        // proceed only if there is a CU available
-
-
-
-                        let ssh_host = &cu.clone().unwrap().fqdn; // ✅ Change this to your target machine
-                        let ssh_user = "dc0102"; // ✅ SSH username
-                        let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh"; // ✅ Remote script path
-
-
-                        // ✅ Update cluster state to "init"
-                        if let Err(err) = update_cluster_state(&db_pool, cluster_name, "init").await {
-                            eprintln!("❌ Failed to update cluster '{}' state: {:?}", cluster_name, err);
-                            continue;
-                        }
-
-                        match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
-                            Ok(_) => {
-                                println!("🎉 Cluster creation completed successfully!");
-                                // ✅ Release lock after cluster creation
-                                release_compute_unit_lock(&mut cache_conn, cu.unwrap().id);
-                                if let Err(err) = update_cluster_state(&db_pool, cluster_name, "running").await {
-                                    eprintln!("❌ Failed to update cluster '{}' state to 'running': {:?}", cluster_name, err);
-                                }
-                            },
-                            Err(error) => eprintln!("❌ Cluster creation failed: {}", error),
-                        }
+                        
                     } else {
                         eprintln!("❌ Invalid message format: {}", message);
                     }

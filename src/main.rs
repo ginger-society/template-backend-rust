@@ -68,7 +68,7 @@ async fn main() {
         .attach(prometheus.clone())
         .mount(
             format!("/{}/", SERVICE_PREFIX),
-            openapi_get_routes![routes::index, routes::provisioner::create_cluster],
+            openapi_get_routes![routes::index, routes::provisioner::create_cluster, routes::provisioner::reset_lock],
         )
         .mount(
             format!("/{}/api-docs", SERVICE_PREFIX),

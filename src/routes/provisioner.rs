@@ -2,6 +2,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use lapin::options::BasicPublishOptions;
 use lapin::BasicProperties;
+use r2d2_redis::redis::Commands;
 use r2d2_redis::RedisConnectionManager;
 use rocket::http::Status;
 use rocket::response::status;
@@ -104,4 +105,25 @@ pub async fn create_cluster(
         id: created_cluster.id,
         identifier: created_cluster.identifier.clone(),
     })))
+}
+
+
+#[openapi()]
+#[post("/reset-lock/<id>")]
+pub async fn reset_lock(
+    id: String,
+    cache: &State<Pool<RedisConnectionManager>>,
+) -> Result<status::Accepted<String>, status::Custom<String>> {
+    let mut cache_conn = cache.get().map_err(|_| {
+        status::Custom(Status::ServiceUnavailable, "Failed to get Redis connection".to_string())
+    })?;
+    
+    
+    let lock_key = format!("LOCK_{}", id);
+    
+    let _: () = cache_conn.del(&lock_key).map_err(|_| {
+        status::Custom(Status::InternalServerError, "Failed to reset lock".to_string())
+    })?;
+    
+    Ok(status::Accepted("Lock reset successfully".to_string()))
 }

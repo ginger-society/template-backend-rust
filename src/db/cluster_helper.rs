@@ -114,10 +114,10 @@ pub fn get_available_compute_unit(
 
             // Check if it's locked in Redis
             let is_locked: bool = cache_conn.get(&lock_key).unwrap_or(false);
-
+            if is_locked {println!("CU is locked , ID: {:?}" , unit.id)}
             if !is_locked {
                 // Lock the compute unit in Redis for 1 hour
-                let set_result: Result<(), _> = cache_conn.set_ex(&lock_key, true, 3600);
+                let set_result: Result<(), _> = cache_conn.set_ex(&lock_key, true, 240); // its a 4 minute timeout
             
                 match set_result {
                     Ok(_) => {
@@ -126,7 +126,7 @@ pub fn get_available_compute_unit(
                     }
                     Err(err) => {
                         println!("❌ Failed to add lock in the cache: {:?}, Error: {:?}", lock_key, err);
-                        return Err(diesel::result::Error::RollbackTransaction); // Or handle error appropriately
+                        return Err(diesel::result::Error::RollbackTransaction);
                     }
                 }
             }
