@@ -1,6 +1,6 @@
 use futures::TryStreamExt;
 use lapin::{
-    options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions}, types::FieldTable, Connection, ConnectionProperties, Consumer,
+    options::{BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions}, types::{AMQPValue, FieldTable}, BasicProperties, Connection, ConnectionProperties, Consumer
 };
 use r2d2_redis::RedisConnectionManager;
 use serde::{Deserialize, Serialize};
@@ -83,6 +83,32 @@ pub async fn start_rabbitmq_consumer(
         }
     };
 
+    // Declare the retry queue with TTL and DLX
+    let mut retry_args = FieldTable::default();
+    retry_args.insert("x-message-ttl".into(), AMQPValue::LongUInt(30000));  // 30s delay
+    retry_args.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".to_string().into()));  // DLX: moves expired messages to main queue
+    retry_args.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(queue_name.clone().into()));  // Route back to main queue
+
+
+    // ✅ Declare retry queue
+    let retry_queue = format!("{}_retry", queue_name);
+    if let Err(err) = channel
+        .queue_declare(
+            &retry_queue,
+            QueueDeclareOptions {
+                durable: true,
+                exclusive: false,
+                auto_delete: false,
+                ..Default::default()
+            },
+            retry_args,
+        )
+        .await
+    {
+        eprintln!("❌ Failed to declare retry queue '{}': {:?}", retry_queue, err);
+        return;
+    }
+
     // ✅ Now start the consumer
     let consumer: Consumer = match channel
         .basic_consume(
@@ -103,6 +129,8 @@ pub async fn start_rabbitmq_consumer(
     println!("✅ Consumer started on queue '{}'", queue_name);
 // ✅ Clone db_pool so it can be moved into the async task
     let db_pool = db_pool.clone(); 
+
+    let channel_clone = channel.clone();
     
     task::spawn(async move {
         let mut consumer_stream = consumer.into_stream();
@@ -147,7 +175,6 @@ pub async fn start_rabbitmq_consumer(
                                 match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
                                     Ok(_) => {
                                         println!("🎉 Cluster creation completed successfully!");
-                                        // ✅ Release lock after cluster creation
                                         release_compute_unit_lock(&mut cache_conn, unit.id);
                                         if let Err(err) = update_cluster_state(&db_pool, cluster_name, "running").await {
                                             eprintln!("❌ Failed to update cluster '{}' state to 'running': {:?}", cluster_name, err);
@@ -158,6 +185,18 @@ pub async fn start_rabbitmq_consumer(
                             },
                             Ok(None) => {
                                 println!("No available compute unit found in the requested region");
+                                if let Err(err) = channel_clone
+                                    .basic_publish(
+                                        "",
+                                        &retry_queue,
+                                        BasicPublishOptions::default(),
+                                        &delivery.data.clone(),
+                                        BasicProperties::default(),
+                                    )
+                                    .await
+                                {
+                                    eprintln!("❌ Failed to move message to retry queue: {:?}", err);
+                                }
                             }
                             Err(_) => {
                                 println!("Error querying compute units");
