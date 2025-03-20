@@ -10,6 +10,8 @@ use tokio::{
 
 use crate::models::schema::Compute_Unit;
 
+use super::rabbitmq::DbPool;
+
 pub async fn create_execute_ssh_script(
     ssh_host: &str,
     ssh_user: &str,
@@ -143,4 +145,20 @@ pub fn get_available_compute_unit(
 pub fn release_compute_unit_lock(cache_conn: &mut PooledConnection<RedisConnectionManager> , compute_unit_id: i64) {
     let lock_key = format!("LOCK_{}", compute_unit_id);
     let _: () = cache_conn.del(&lock_key).unwrap_or(());
+}
+
+pub async fn update_cluster_state(
+    db_pool: &DbPool,
+    cluster_name: &str,
+    new_state: &str,
+) -> Result<(), diesel::result::Error> {
+    let mut conn = db_pool.get().expect("Failed to get DB connection");
+    use crate::models::schema::schema::cluster::dsl::*;
+
+    diesel::update(cluster.filter(name.eq(cluster_name)))
+        .set(state.eq(new_state))
+        .execute(&mut conn)?;
+
+    println!("✅ Cluster '{}' state updated to '{}'", cluster_name, new_state);
+    Ok(())
 }

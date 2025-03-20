@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::{sync::Mutex, task};
 use tokio_stream::StreamExt;
 use diesel::{r2d2::ConnectionManager, ExpressionMethods, RunQueryDsl};
-use crate::db::cluster_helper::{create_execute_ssh_script, get_available_compute_unit, release_compute_unit_lock};
+use crate::db::cluster_helper::{create_execute_ssh_script, get_available_compute_unit, release_compute_unit_lock, update_cluster_state};
 use crate::models::schema::Compute_Unit;
 use diesel::PgConnection;
 use diesel::r2d2::Pool;
@@ -36,24 +36,8 @@ pub async fn create_rabbitmq_pool(rabbitmq_uri: String) -> RabbitMQPool {
     Arc::new(Mutex::new(connection))
 }
 
-// ✅ Update cluster state in the database
-pub async fn update_cluster_state(
-    db_pool: &DbPool,
-    cluster_name: &str,
-    new_state: &str,
-) -> Result<(), diesel::result::Error> {
-    let mut conn = db_pool.get().expect("Failed to get DB connection");
-    use crate::models::schema::schema::cluster::dsl::*;
 
-    diesel::update(cluster.filter(name.eq(cluster_name)))
-        .set(state.eq(new_state))
-        .execute(&mut conn)?;
-
-    println!("✅ Cluster '{}' state updated to '{}'", cluster_name, new_state);
-    Ok(())
-}
-
-pub async fn start_rabbitmq_consumer(
+pub async fn start_rabbitmq_cluster_message_consumer(
     rabbitmq_pool: Arc<Mutex<lapin::Connection>>,
     db_pool: DbPool,
     cache_pool: Pool<RedisConnectionManager>,
@@ -142,7 +126,7 @@ pub async fn start_rabbitmq_consumer(
             let retry_queue = retry_queue.clone();
 
             tokio::spawn(async move {
-                match handle_message(delivery_result, &channel_clone, &db_pool, &cache_pool, &retry_queue).await {
+                match handle_create_cluster_message(delivery_result, &channel_clone, &db_pool, &cache_pool, &retry_queue).await {
                     Ok(_) => {}
                     Err(err) => eprintln!("❌ Error processing message: {:?}", err),
                 }
@@ -151,7 +135,7 @@ pub async fn start_rabbitmq_consumer(
     });
 }
 
-async fn handle_message(
+async fn handle_create_cluster_message(
     delivery: lapin::message::Delivery,
     channel: &Channel,
     db_pool: &DbPool,

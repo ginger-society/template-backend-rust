@@ -51,7 +51,7 @@ async fn main() {
 
                 let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
 
-                db::rabbitmq::start_rabbitmq_consumer(rabbitmq_pool.clone(), db_pool, cache_pool, queue_name).await;  // ✅ Pass `db_pool`
+                db::rabbitmq::start_rabbitmq_cluster_message_consumer(rabbitmq_pool.clone(), db_pool, cache_pool, queue_name).await;  // ✅ Pass `db_pool`
 
                 Some(rabbitmq_pool)
             } else {
