@@ -163,6 +163,16 @@ async fn handle_create_cluster_message(
                         println!("🎉 Cluster creation completed successfully!");
                         release_compute_unit_lock(&mut cache_conn, unit.id);
                         update_cluster_state(db_pool, cluster_name, "running").await?;
+                        channel
+                        .basic_publish(
+                            "",
+                            &format!("{}_waiting_queue", "delete_channel"),
+                            BasicPublishOptions::default(),
+                            message.as_bytes(),
+                            BasicProperties::default()
+                                .with_expiration(format!("{}", 6_00_000).into()), // TTL in milliseconds
+                        )
+                        .await?;
                     }
                     Err(error) => eprintln!("❌ Cluster creation failed: {}", error),
                 }

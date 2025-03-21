@@ -183,7 +183,7 @@ pub async fn delete_cluster(
         .map_err(|err| format!("❌ Database error: {:?}", err))?;
     
     if let Some((cluster_id, parent_server_fqdn)) = cluster_details {
-        let parent_server_fqdn = parent_server_fqdn.unwrap();
+        let parent_server_fqdn = "dc0102.rackmint.com";
         // Fetch Compute Unit details
         let compute_unit_details: Compute_Unit = compute_unit
             .filter(fqdn.eq(parent_server_fqdn.clone()))
@@ -217,7 +217,6 @@ pub async fn delete_cluster(
         
         if exit_status.success() {
             // Delete the cluster from the database
-            println!("✅ Cluster '{}' deleted successfully.", cluster_name);
             return Ok(Some(compute_unit_details));
         } else {
             return Err(format!("❌ Cluster deletion script failed with exit status: {:?}", exit_status));

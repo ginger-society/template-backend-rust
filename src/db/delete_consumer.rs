@@ -38,8 +38,24 @@ pub async fn start_rabbitmq_cluster_deletion_consumer(
         return;
     }
 
+    match channel.queue_declare(
+        &format!("{}_waiting_queue", queue_name.clone()),
+        QueueDeclareOptions::default(),
+        {
+            let mut args = FieldTable::default();
+            args.insert("x-dead-letter-exchange".into(), AMQPValue::LongString("".into())); // Default exchange
+            args.insert("x-dead-letter-routing-key".into(), AMQPValue::LongString(queue_name.clone().into())); // Move to main queue
+            args.insert("x-message-ttl".into(), AMQPValue::LongInt(1200000)); // 1200s delay
+            args
+        },
+    ).await{
+        Ok(_) => {println!("Waiting queue declared")},
+        Err(_) => {println!("error creating waiting queue")},
+    };
+
+
     let consumer: Consumer = match channel
-        .basic_consume(&queue_name, "delete_consumer", BasicConsumeOptions::default(), FieldTable::default())
+        .basic_consume(&queue_name.clone(), "delete_consumer", BasicConsumeOptions::default(), FieldTable::default())
         .await
     {
         Ok(consumer) => consumer,
