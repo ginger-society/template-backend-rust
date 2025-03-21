@@ -16,6 +16,7 @@ mod fairings;
 mod middlewares;
 mod models;
 mod routes;
+use crate::routes::provisioner;
 
 const SERVICE_PREFIX: &str = "provisioner";
 
@@ -70,7 +71,7 @@ async fn main() {
         .attach(prometheus.clone())
         .mount(
             format!("/{}/", SERVICE_PREFIX),
-            openapi_get_routes![routes::index, routes::provisioner::create_cluster, routes::provisioner::reset_lock],
+            openapi_get_routes![routes::index, provisioner::create_cluster, provisioner::reset_lock, provisioner::delete_cluster_by_identifier],
         )
         .mount(
             format!("/{}/api-docs", SERVICE_PREFIX),

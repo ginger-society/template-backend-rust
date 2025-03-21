@@ -136,7 +136,7 @@ async fn handle_create_cluster_message(
 
     let parsed_message: Result<Value, _> = serde_json::from_str(&message);
     if let Ok(json_data) = parsed_message {
-        let cluster_name = json_data["name"].as_str().unwrap_or("default-cluster");
+        let cluster_id = json_data["identifier"].as_str().unwrap_or("default-cluster");
         let cpus = json_data["cpu_limit"].as_f64().map(|v| v.round() as i64).unwrap_or(2);
         let memory = format!("{}g", json_data["ram_limit"].as_f64().unwrap_or(2.0));
         let disk_size = format!("{}g", json_data["disk_size"].as_i64().unwrap_or(10));
@@ -150,19 +150,17 @@ async fn handle_create_cluster_message(
                 let ssh_user = "dc0102";
                 let script_path = "/home/dc0102/Documents/rackmint-infra-as-code/create-cluster.sh";
 
-                if let Err(err) = update_cluster_state(db_pool, cluster_name, "init").await {
-                    eprintln!("❌ Failed to update cluster '{}' state: {:?}", cluster_name, err);
+                if let Err(err) = update_cluster_state(db_pool, cluster_id, "init").await {
+                    eprintln!("❌ Failed to update cluster '{}' state: {:?}", cluster_id, err);
                     return Err(err.into());
                 }
                 println!("Executing on {:?}" , unit);
-                sleep(Duration::from_secs(10)).await;
-
                 
-                match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_name, cpus, &memory, &disk_size).await {
+                match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_id, cpus, &memory, &disk_size).await {
                     Ok(_) => {
                         println!("🎉 Cluster creation completed successfully!");
                         release_compute_unit_lock(&mut cache_conn, unit.id);
-                        update_cluster_state(db_pool, cluster_name, "running").await?;
+                        update_cluster_state(db_pool, cluster_id, "running").await?;
                         channel
                         .basic_publish(
                             "",

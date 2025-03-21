@@ -97,20 +97,20 @@ async fn handle_delete_cluster_message(
 
     let parsed_message: Result<Value, _> = serde_json::from_str(&message);
     if let Ok(json_data) = parsed_message {
-        let cluster_name = json_data["name"].as_str().unwrap_or("unknown-cluster");
+        let cluster_uid = json_data["identifier"].as_str().unwrap_or("unknown-cluster");
         let mut cache_conn = cache_pool.get().expect("Failed to get cache connection");
 
-        match delete_cluster(&db_pool, cluster_name).await {
+        match delete_cluster(&db_pool, cluster_uid).await {
             Ok(Some(unit)) => {
-                println!("✅ Cluster '{}' deleted successfully.", cluster_name);
+                println!("✅ Cluster '{}' deleted successfully.", cluster_uid);
                 release_compute_unit_lock(&mut cache_conn, unit.id);
-                update_cluster_state(db_pool, cluster_name, "deleted").await?;
+                update_cluster_state(db_pool, cluster_uid, "deleted").await?;
             }
             Ok(None) => {
-                println!("⚠️ Cluster '{}' not found.", cluster_name);
+                println!("⚠️ Cluster '{}' not found.", cluster_uid);
             }
             Err(err) => {
-                eprintln!("❌ Failed to delete cluster '{}': {:?}", cluster_name, err);
+                eprintln!("❌ Failed to delete cluster '{}': {:?}", cluster_uid, err);
             }
         }
     } else {
