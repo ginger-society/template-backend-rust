@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use diesel::{r2d2::PooledConnection, PgConnection};
 use diesel::prelude::*;
 use openssh::{KnownHosts, Session, Stdio};
 use r2d2_redis::redis::Commands;
 use r2d2_redis::RedisConnectionManager;
+use tokio::sync::Mutex;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     time::{timeout, Duration},
@@ -20,7 +23,7 @@ pub async fn create_execute_ssh_script(
     cpus: i64,
     memory: &str,
     disk_size: &str,
-) -> Result<(), String> {
+) -> Result<String, String> {
     // ✅ Establish SSH connection
     let session = match Session::connect(format!("{}@{}", ssh_user, ssh_host), KnownHosts::Accept).await {
         Ok(session) => session,
@@ -55,12 +58,20 @@ pub async fn create_execute_ssh_script(
     let stdout = child.stdout().take().ok_or("❌ Failed to capture stdout")?;
     let stderr = child.stderr().take().ok_or("❌ Failed to capture stderr")?;
 
+    // ✅ Convert to async reader and read lines properly
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
+
+    let kubeconfig_lines = Arc::new(Mutex::new(Vec::new()));
+    let kubeconfig_lines_stdout = Arc::clone(&kubeconfig_lines);
 
     let stdout_task = tokio::spawn(async move {
         while let Ok(Some(line)) = stdout_reader.next_line().await {
             println!("📜 [STDOUT] {}", line);
+            if line.contains("[KUBECONFIG]") {
+                let mut kubeconfig = kubeconfig_lines_stdout.lock().await;
+                kubeconfig.push(line.replace("[KUBECONFIG] ", ""));
+            }
         }
     });
 
@@ -88,6 +99,14 @@ pub async fn create_execute_ssh_script(
     {
         Ok(result) => result,
         Err(_) => Err("⏳ SSH command timed out after 5 minutes".to_string()),
+    }?;
+
+    let kubeconfig_lines = kubeconfig_lines.lock().await;
+    if !kubeconfig_lines.is_empty() {
+        let kubeconfig = kubeconfig_lines.join("\n");
+        Ok(kubeconfig)
+    } else {
+        Err("⚠️  No kubeconfig data captured.".to_string())
     }
 }
 
@@ -162,6 +181,25 @@ pub async fn update_cluster_state(
     println!("✅ Cluster '{}' state updated to '{}'", cluster_id, new_state);
     Ok(())
 }
+
+pub async fn update_cluster_kubeconfig(
+    db_pool: &DbPool,
+    cluster_id: &str,
+    config: String,
+) -> Result<(), diesel::result::Error> {
+    let mut conn = db_pool.get().expect("Failed to get DB connection");
+    use crate::models::schema::schema::cluster::dsl::*;
+
+    diesel::update(cluster.filter(identifier.eq(cluster_id)))
+        .set(kubeconfig.eq(config))
+        .execute(&mut conn)?;
+
+    println!("✅ Cluster '{}' kubeconfig updated", cluster_id);
+    Ok(())
+}
+
+
+
 
 pub async fn delete_cluster(
     db_pool: &DbPool,

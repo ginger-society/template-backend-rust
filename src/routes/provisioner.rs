@@ -54,6 +54,7 @@ pub async fn create_cluster(
         state: Some("init".to_string()),
         woskspace_id: create_request.workspace_id.clone(),
         disk_space: create_request.disk_size,
+        kubeconfig: None,
     };
 
     let created_cluster: Cluster = diesel::insert_into(cluster)

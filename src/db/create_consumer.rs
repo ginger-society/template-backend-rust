@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::{sync::Mutex};
 use diesel::{r2d2::ConnectionManager};
-use crate::db::cluster_helper::{create_execute_ssh_script, get_available_compute_unit, release_compute_unit_lock, update_cluster_state};
+use crate::db::cluster_helper::{create_execute_ssh_script, get_available_compute_unit, release_compute_unit_lock, update_cluster_kubeconfig, update_cluster_state};
 use diesel::PgConnection;
 use diesel::r2d2::Pool;
 
@@ -157,10 +157,13 @@ async fn handle_create_cluster_message(
                 println!("Executing on {:?}" , unit);
                 
                 match create_execute_ssh_script(ssh_host, ssh_user, script_path, cluster_id, cpus, &memory, &disk_size).await {
-                    Ok(_) => {
-                        println!("🎉 Cluster creation completed successfully!");
+                    Ok(kubeconfig) => {
+                        println!("🎉 Cluster creation completed successfully!" );
                         release_compute_unit_lock(&mut cache_conn, unit.id);
                         update_cluster_state(db_pool, cluster_id, "running").await?;
+
+                        update_cluster_kubeconfig(db_pool, cluster_id, kubeconfig).await?;
+
                         channel
                         .basic_publish(
                             "",
