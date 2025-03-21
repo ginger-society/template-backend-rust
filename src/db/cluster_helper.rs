@@ -162,3 +162,68 @@ pub async fn update_cluster_state(
     println!("✅ Cluster '{}' state updated to '{}'", cluster_name, new_state);
     Ok(())
 }
+
+
+pub async fn delete_cluster(
+    db_pool: &DbPool,
+    cluster_name: &str,
+) -> Result<Option<Compute_Unit>, String> {
+    use crate::models::schema::schema::cluster::dsl as cluster_dsl;
+    use crate::models::schema::schema::compute_unit::dsl::*;
+
+    let mut conn = db_pool.get().expect("Failed to get DB connection");
+
+    
+    // Fetch the cluster details
+    let cluster_details: Option<(i64, Option<String>)> = cluster_dsl::cluster
+        .filter(cluster_dsl::name.eq(cluster_name))
+        .select((cluster_dsl::id, cluster_dsl::parent_server_fqdn))
+        .first::<(i64, Option<String>)>(&mut conn)
+        .optional()
+        .map_err(|err| format!("❌ Database error: {:?}", err))?;
+    
+    if let Some((cluster_id, parent_server_fqdn)) = cluster_details {
+        let parent_server_fqdn = parent_server_fqdn.unwrap();
+        // Fetch Compute Unit details
+        let compute_unit_details: Compute_Unit = compute_unit
+            .filter(fqdn.eq(parent_server_fqdn.clone()))
+            .first::<Compute_Unit>(&mut conn)
+            .map_err(|err| format!("❌ Failed to fetch compute unit: {:?}", err))?;
+        
+        let ssh_user = "dc0102"; // Replace with actual SSH user
+        let delete_script_path = "/home/dc0102/Documents/rackmint-infra-as-code/delete-cluster.sh"; // Replace with actual script path
+        
+        // Establish SSH connection
+        let session = Session::connect(format!("{}@{}", ssh_user, parent_server_fqdn), KnownHosts::Accept)
+            .await
+            .map_err(|err| format!("❌ SSH connection failed: {:?}", err))?;
+
+        println!("✅ Connected to {} for cluster deletion", parent_server_fqdn);
+        
+        // Execute deletion script
+        let command = format!("bash {} '{}'", delete_script_path, cluster_name);
+        let mut child = session
+            .command("sh")
+            .arg("-c")
+            .arg(&command)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .await
+            .map_err(|err| format!("❌ Failed to execute delete script: {:?}", err))?;
+        
+        let exit_status = child.wait().await.map_err(|err| format!("❌ SSH command error: {:?}", err))?;
+        
+        if exit_status.success() {
+            // Delete the cluster from the database
+            println!("✅ Cluster '{}' deleted successfully.", cluster_name);
+            return Ok(Some(compute_unit_details));
+        } else {
+            return Err(format!("❌ Cluster deletion script failed with exit status: {:?}", exit_status));
+        }
+    }
+    
+    println!("⚠️ Cluster '{}' not found.", cluster_name);
+    Ok(None)
+}

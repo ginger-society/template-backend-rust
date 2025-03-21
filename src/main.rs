@@ -50,8 +50,10 @@ async fn main() {
                 let rabbitmq_pool = db::rabbitmq::create_rabbitmq_pool(rabbitmq_uri.clone()).await;
 
                 let queue_name = env::var("RABBITMQ_QUEUE_NAME").unwrap_or_else(|_| "default_channel".to_string());
+                let delete_queue_name = env::var("RABBITMQ_DELETE_QUEUE_NAME").unwrap_or_else(|_| "delete_channel".to_string());
 
-                db::rabbitmq::start_rabbitmq_cluster_message_consumer(rabbitmq_pool.clone(), db_pool, cache_pool, queue_name).await;  // ✅ Pass `db_pool`
+                db::create_consumer::start_rabbitmq_cluster_message_consumer(rabbitmq_pool.clone(), db_pool.clone(), cache_pool.clone(), queue_name).await;  // ✅ Pass `db_pool`
+                db::delete_consumer::start_rabbitmq_cluster_deletion_consumer(rabbitmq_pool.clone(), db_pool.clone(), cache_pool.clone(), delete_queue_name).await;  // ✅ Pass `db_pool`
 
                 Some(rabbitmq_pool)
             } else {
